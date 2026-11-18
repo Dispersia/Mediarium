@@ -2,6 +2,8 @@
 /bin/
 /dist/
 *.exe
+/result
+/result-*
 
 # Local dev data (matches the /config volume mount)
 /config/

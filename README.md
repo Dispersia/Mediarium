@@ -94,6 +94,10 @@ The [install guide](docs/INSTALL.md) covers every line of [`docker-compose.yml`]
 
 Step-by-step guides: **[Synology](docs/synology.md)** (including running next to Radarr, Sonarr and SABnzbd) · **[Unraid](docs/unraid.md)** · **[QNAP](docs/qnap.md)** · **[Linux](docs/linux.md)**. Coming from the *arr apps? See [Move from Radarr, Sonarr, Prowlarr and SABnzbd](docs/migrate.md).
 
+### NixOS
+
+The repository also has a flake with a package, a `services.mediarium` NixOS module and a VM test. It builds the web UI into the binary and installs the runtime tools the app uses. See [`nix/README.md`](nix/README.md) for a configuration example, the service options and the nixpkgs layout.
+
 ### One image for every platform
 
 Mediarium comes as one Docker image, and everything that can run Docker runs the same image with the same settings. There is no separate build or app-store version to wait for.

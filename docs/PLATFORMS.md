@@ -1,12 +1,13 @@
 # What runs where
 
-Mediarium is one Docker image, and every platform below runs that same image with the same settings. There is nothing separate to wait for: the install is the same compose file or the same few fields everywhere.
+Mediarium is one Docker image, and every platform below runs that same image with the same settings. There is nothing separate to wait for: the install is the same compose file or the same few fields everywhere. NixOS and Nix users can use the [flake](../nix/README.md) instead of Docker.
 
 ## Available now
 
 | Platform | How | Guide |
 |---|---|---|
 | Any 64-bit Linux server or NAS with Docker (Intel/AMD `amd64`, ARM `arm64`) | Docker Compose, or one `docker run` command | [INSTALL.md](./INSTALL.md) |
+| NixOS (and Linux with Nix) | Flake with a package, `services.mediarium` module and VM test | [nix/README.md](../nix/README.md) |
 | Synology DSM 7.2+ | Container Manager project (paste the compose file) | [synology.md](./synology.md) |
 | Unraid | Docker tab → Add Container | [unraid.md](./unraid.md) |
 | QNAP | Container Station application (paste the compose file) | [qnap.md](./qnap.md) |
@@ -20,7 +21,7 @@ The image is `ghcr.io/rdborg/mediarium:latest` (also on Docker Hub as `rdborg/me
 
 | What | Where it stands |
 |---|---|
-| Linux without Docker (`.deb`, `.rpm`, systemd) | Not planned for now |
+| Linux without Docker, as a `.deb` or `.rpm` package | Not planned for now; NixOS and Nix users can use the [flake](../nix/README.md) |
 | One-click entries in app stores (Unraid Community Applications, TrueNAS, CasaOS/ZimaOS, Umbrel, Proxmox helper scripts, Helm) | Not planned for now: the Docker install above does the same job. [Tell us](https://github.com/rdborg/Mediarium/issues/new/choose) which one you would use |
 | Synology Package Center (`.spk`) | Not possible with a Docker app: use Container Manager ([synology.md](./synology.md)) |
 | Raspberry Pi with a 32-bit OS (`armv7`) | Not supported |
