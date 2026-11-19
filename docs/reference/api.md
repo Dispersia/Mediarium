@@ -146,7 +146,7 @@ Every route the server exposes. Routes marked **public** need no sign-in; all ot
 | POST | `/api/books/manual` | any account | is POST /api/books/manual: a book, an audiobook or both, typed in by hand. |
 | GET | `/api/books/progress` | any account | GET /api/books/progress: where the person is in every book. |
 | GET | `/api/books/search` | any account | looks books up on Open Library, and on Hardcover when a token is saved. |
-| GET | `/api/books/search/google` | any account | lists Google Books results in Google's order, in the movie and show info language. |
+| GET | `/api/books/search/google` | any account | lists Google Books results in Google's order, in the movie and show info language; a query in another script is not held to that language. |
 | POST | `/api/books/search/google` | any account | adds a book found through Google Books. |
 | GET | `/api/books/subjects` | any account | GET /api/books/subjects: the genres the Discover filter offers. |
 | DELETE | `/api/books/{id}` | admin | removes a book; with ?deleteFiles=true its files go to the recycle bin of their folder (or are deleted when the bin is off). |

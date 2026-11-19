@@ -64,6 +64,49 @@ func TestGoogleBooksSearchKeepsOrderAndLanguage(t *testing.T) {
 	}
 }
 
+// A query typed in another script is sent without langRestrict, so Google can
+// return the Japanese or Chinese editions; a Latin query keeps the filter.
+func TestGoogleBooksDropsTheLanguageFilterForOtherScripts(t *testing.T) {
+	tests := []struct {
+		name string
+		q    string
+		want string // the langRestrict that must be sent, "" when it must be left out
+	}{
+		{"latin query keeps the info language", "ilaria tuti", "it"},
+		{"accented latin is still latin", "Le Pere Goriot", "it"},
+		{"japanese query is not restricted", "村上春樹 ノルウェイの森", ""},
+		{"chinese query is not restricted", "红楼梦", ""},
+		{"cyrillic query is not restricted", "Преступление и наказание", ""},
+		{"mixed query is not restricted", "Murakami 村上", ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var got string
+			var present bool
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got, present = r.URL.Query().Get("langRestrict"), r.URL.Query().Has("langRestrict")
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"items":[]}`))
+			}))
+			defer srv.Close()
+			g := NewGoogleBooks("", "test")
+			g.Base = srv.URL
+			if _, err := g.Search(context.Background(), tc.q, "it-IT", 5); err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == "" {
+				if present {
+					t.Fatalf("langRestrict=%q, want it left out for %q", got, tc.q)
+				}
+				return
+			}
+			if got != tc.want {
+				t.Fatalf("langRestrict=%q, want %q for %q", got, tc.want, tc.q)
+			}
+		})
+	}
+}
+
 func TestGoogleBooksRejectsABadKeyWithoutTheAddress(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)

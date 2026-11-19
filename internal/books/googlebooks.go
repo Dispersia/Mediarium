@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // Google Books is asked after Open Library and Hardcover, and only to fill a
@@ -85,6 +86,19 @@ func GoogleBooksLanguage(infoTag string) string {
 		return tag
 	}
 	return "en"
+}
+
+// hasNonLatinLetters reports whether q holds a letter outside the Latin
+// script: Han, Kana, Hangul, Cyrillic, Greek, Arabic and so on. Such a query
+// goes to Google Books without a language restriction (see Search), so a
+// title typed in Japanese or Chinese can still find its own editions.
+func hasNonLatinLetters(q string) bool {
+	for _, r := range q {
+		if unicode.IsLetter(r) && !unicode.Is(unicode.Latin, r) {
+			return true
+		}
+	}
+	return false
 }
 
 const googleKeyPrefix = "gb-"
@@ -286,9 +300,14 @@ func (g *GoogleBooks) Check(ctx context.Context) error {
 	return nil
 }
 
-// Search lists volumes for q in Google's order, restricted to lang (an info
-// tag such as "it-IT", or already an ISO code). It is never sorted again.
+// Search lists volumes for q in Google's order. It is never sorted again.
 // An empty key still asks Google.
+//
+// lang (an info tag such as "it-IT", or already an ISO code) is sent as
+// langRestrict, but only for a query written in the Latin script. A query in
+// another script (Han, Kana, Hangul, Cyrillic...) is left unrestricted:
+// holding a search typed in Japanese or Chinese to the info language drops
+// exactly the editions the person is looking for.
 func (g *GoogleBooks) Search(ctx context.Context, q, lang string, limit int) ([]GoogleHit, error) {
 	q = strings.TrimSpace(q)
 	if len(q) < 2 {
@@ -297,12 +316,15 @@ func (g *GoogleBooks) Search(ctx context.Context, q, lang string, limit int) ([]
 	if limit <= 0 || limit > 40 {
 		limit = 12
 	}
-	status, body, err := g.fetch(ctx, "/volumes", url.Values{
-		"q":            {q},
-		"maxResults":   {strconv.Itoa(limit)},
-		"langRestrict": {GoogleBooksLanguage(lang)},
-		"printType":    {"books"},
-	})
+	query := url.Values{
+		"q":          {q},
+		"maxResults": {strconv.Itoa(limit)},
+		"printType":  {"books"},
+	}
+	if !hasNonLatinLetters(q) {
+		query.Set("langRestrict", GoogleBooksLanguage(lang))
+	}
+	status, body, err := g.fetch(ctx, "/volumes", query)
 	if err != nil {
 		return nil, err
 	}
