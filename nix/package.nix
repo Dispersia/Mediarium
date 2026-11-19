@@ -9,12 +9,12 @@
   runCommand,
   util-linux,
   _7zz,
-  version ? "4.0.9",
+  version ? "4.1.0",
   src ? fetchFromGitHub {
     owner = "rdborg";
     repo = "Mediarium";
     rev = "v${version}";
-    hash = "sha256-ARxRziwXW5TYL9REPYdvtWjpJuF3BMu/8UkPFQpRbK0=";
+    hash = "sha256-6QJigt4GGI+w0HgfPLYfySDtXu+ZlxSBCuO4oBDev7U=";
   },
 }:
 
