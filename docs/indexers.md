@@ -213,8 +213,10 @@ Only add files from people you trust. A definition decides which addresses Media
 A few definitions use things the engine can't run. The list marks them as unsupported and says why. Today that's:
 
 - logins that always show a CAPTCHA (use the cookie option if the site offers it);
-- regular expressions with look-ahead or look-behind in the definition's extraction filters (in text clean-up replacements they're skipped, leaving the text unchanged);
-- a small number of definitions with invalid selectors.
+- a small number of definitions with invalid selectors;
+- patterns that are too costly to run, which are refused rather than slowing every search.
+
+Look-ahead, look-behind and back-references in definitions run through a .NET-compatible engine with a short time limit, so sites like Nyaa.si work.
 
 Sites change their pages. When a site changes before its definition is updated, searches from it fail or come back empty. A date the site writes differently from what its definition expects is read as any common date format instead, so it no longer fails the search. Refreshing the list picks up the fix once the community has made one.
 

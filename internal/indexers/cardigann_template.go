@@ -612,15 +612,15 @@ func tmplJoin(list any, sep string) string {
 }
 
 func tmplReReplace(s any, pattern, replacement string) (string, error) {
-	re, err := compileDotNetRegex(pattern)
-	if err != nil {
-		if errors.Is(err, errRegexTooBig) {
-			return "", err
+	c := compileFilterRegex(pattern)
+	if c.err != nil {
+		if errors.Is(c.err, errRegexTooBig) {
+			return "", c.err
 		}
-		warnSkippedRegex(err)
+		warnSkippedRegex(c.err)
 		return fmt.Sprint(s), nil
 	}
-	return regexReplaceMax(re, fmt.Sprint(s), replacement, maxTemplateOutput)
+	return regexReplaceCompiled(c, fmt.Sprint(s), replacement, maxTemplateOutput)
 }
 
 var (

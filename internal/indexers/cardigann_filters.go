@@ -10,9 +10,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/dlclark/regexp2"
 )
 
 // FilterBlock is one entry of a definition's `filters:` list.
@@ -114,16 +117,73 @@ func applyFilter(data string, f FilterBlock, vars *tmplVars) (string, error) {
 // errPageTooComplex is returned once a page has used up its work budget.
 var errPageTooComplex = errors.New("the page is too complex to read")
 
+// compiledFilterRegex is a filter pattern compiled for the dialect the
+// definition actually uses. RE2 is preferred (linear time); a pattern that
+// needs .NET look-around or back-references is compiled with regexp2 and
+// bounded by a timeout.
+type compiledFilterRegex struct {
+	re     *regexp.Regexp
+	re2    *regexp2.Regexp
+	weight int64
+	err    error
+}
+
+var (
+	filterRegexMu    sync.Mutex
+	filterRegexCache = map[string]compiledFilterRegex{}
+)
+
+// filterRegexTimeout stops a pathological .NET pattern from holding up a
+// search. Definitions normally use simple look-arounds, which finish in
+// microseconds; this only catches a badly written or hostile one.
+const filterRegexTimeout = 200 * time.Millisecond
+
+// compileFilterRegex compiles a Cardigann regex, falling back to regexp2 when
+// RE2 cannot express it (look-ahead, look-behind, back-references, atomic
+// groups). Nyaa.si's definition is one that needs this.
+func compileFilterRegex(pattern string) compiledFilterRegex {
+	filterRegexMu.Lock()
+	c, ok := filterRegexCache[pattern]
+	filterRegexMu.Unlock()
+	if ok {
+		return c
+	}
+
+	simple := compileDotNetRegexCost(pattern)
+	if simple.err == nil {
+		c = compiledFilterRegex{re: simple.re, weight: simple.weight}
+	} else if errors.Is(simple.err, errRegexTooBig) {
+		c = compiledFilterRegex{err: simple.err}
+	} else {
+		re2, err := regexp2.Compile(pattern, regexp2.None)
+		if err != nil {
+			// Keep the RE2 error: it names the construct that was refused.
+			c = compiledFilterRegex{err: simple.err}
+		} else {
+			re2.MatchTimeout = filterRegexTimeout
+			c = compiledFilterRegex{re2: re2, weight: 1}
+		}
+	}
+
+	filterRegexMu.Lock()
+	if len(filterRegexCache) > 4096 {
+		filterRegexCache = map[string]compiledFilterRegex{}
+	}
+	filterRegexCache[pattern] = c
+	filterRegexMu.Unlock()
+	return c
+}
+
 // regexFor compiles a filter's pattern and pays for running it over data.
-func regexFor(pattern, data string, budget *workBudget) (*regexp.Regexp, error) {
-	c := compileDotNetRegexCost(pattern)
+func regexFor(pattern, data string, budget *workBudget) (compiledFilterRegex, error) {
+	c := compileFilterRegex(pattern)
 	if c.err != nil {
-		return nil, c.err
+		return c, c.err
 	}
 	if !budget.spend(int64(len(data)+1) * c.weight) {
-		return nil, errPageTooComplex
+		return c, errPageTooComplex
 	}
-	return c.re, nil
+	return c, nil
 }
 
 func applyFilterWith(data string, f FilterBlock, vars *tmplVars, budget *workBudget) (string, error) {
@@ -151,7 +211,21 @@ func applyFilterWith(data string, f FilterBlock, vars *tmplVars, budget *workBud
 		if err != nil {
 			return "", err
 		}
-		m := re.FindStringSubmatch(data)
+		if re.re2 != nil {
+			m, err := re.re2.FindStringMatch(data)
+			if err != nil {
+				return "", err
+			}
+			if m == nil {
+				return "", nil
+			}
+			g := m.GroupByNumber(1)
+			if g == nil {
+				return "", nil
+			}
+			return g.String(), nil
+		}
+		m := re.re.FindStringSubmatch(data)
 		if len(m) < 2 {
 			return "", nil
 		}
@@ -169,7 +243,7 @@ func applyFilterWith(data string, f FilterBlock, vars *tmplVars, budget *workBud
 		if err != nil {
 			return "", err
 		}
-		return regexReplace(re, data, rep)
+		return regexReplaceCompiled(re, data, rep, maxFilterBytes)
 	case "replace":
 		rep, err := tmplArg(argAt(args, 1), vars)
 		if err != nil {
@@ -287,6 +361,22 @@ func regexReplaceMax(re *regexp.Regexp, data, replacement string, limit int) (st
 		return "", fmt.Errorf("the replacement could make the text too large")
 	}
 	return re.ReplaceAllString(data, rep), nil
+}
+
+// regexReplaceCompiled is regexReplace for either engine. regexp2 already
+// understands .NET's $1 replacement syntax, so the replacement is passed
+// through unchanged for it.
+func regexReplaceCompiled(c compiledFilterRegex, data, replacement string, limit int) (string, error) {
+	if (len(data)+1)*(len(replacement)+1)+len(data) > limit {
+		return "", fmt.Errorf("the replacement could make the text too large")
+	}
+	if c.re2 != nil {
+		return c.re2.Replace(data, replacement, -1, -1)
+	}
+	if c.re == nil {
+		return "", c.err
+	}
+	return regexReplaceMax(c.re, data, replacement, limit)
 }
 
 // firstRune is the first character of s (all of it, when it is one character).

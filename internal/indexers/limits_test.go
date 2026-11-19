@@ -206,7 +206,7 @@ func TestCostlyRegularExpressions(t *testing.T) {
 	}
 
 	// a re_replace that is too costly is refused when the definition loads;
-	// one Go merely can't express still loads (it leaves the text as it is)
+	// one that needs .NET look-around is run by the fallback engine and loads.
 	def := func(pattern string) *Definition {
 		d := &Definition{ID: "x", Links: []string{"https://www.example.org/"}, Search: SearchBlock{
 			Paths: []SearchPath{{Path: "s"}},
@@ -225,6 +225,15 @@ func TestCostlyRegularExpressions(t *testing.T) {
 	}
 	if p := def(`(?<=a)b`).Problems(); len(p) != 0 {
 		t.Errorf("a look-behind re_replace should still load: %v", p)
+	}
+	// Nyaa.si declares a `regexp` field with look-around around Movies/OVA.
+	regexpDef := def(`(?<=a)b`)
+	regexpDef.Search.Fields.Values["title"] = SelectorField{
+		Selector: "td",
+		Filters:  []FilterBlock{{Name: "regexp", Args: []any{`(?<=a)b`}}},
+	}
+	if p := regexpDef.Problems(); len(p) != 0 {
+		t.Errorf("a look-behind regexp field should load: %v", p)
 	}
 
 	// one page can only run so much pattern work

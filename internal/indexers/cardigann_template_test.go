@@ -122,7 +122,9 @@ func TestFilters(t *testing.T) {
 		{"regexp group", "Size: 1.5 GB", FilterBlock{"regexp", `([\d.]+ \w+)`}, "1.5 GB"},
 		{"regexp no match", "nothing", FilterBlock{"regexp", `(\d+)`}, ""},
 		{"re_replace", "a.b.c", FilterBlock{"re_replace", []any{`\.`, " "}}, "a b c"},
-		{"re_replace unsupported leaves value", "MULTI", FilterBlock{"re_replace", []any{`MULTI(?!x)`, "y"}}, "MULTI"},
+		{"re_replace lookahead", "MULTI", FilterBlock{"re_replace", []any{`MULTI(?!x)`, "y"}}, "y"},
+		{"re_replace lookbehind", "x y", FilterBlock{"re_replace", []any{`(?<=x )y`, "z"}}, "x z"},
+		{"regexp lookaround", "An OVA release", FilterBlock{"regexp", `(?i)(?<![A-Za-z0-9])(Movies?|OVA|OAV)(?![A-Za-z0-9])`}, "OVA"},
 		{"replace", "Hello World", FilterBlock{"replace", []any{"World", "There"}}, "Hello There"},
 		{"split", "/torrent/123/name/", FilterBlock{"split", []any{"/", 2}}, "123"},
 		{"split negative", "a-b-c", FilterBlock{"split", []any{"-", -1}}, "c"},
@@ -163,7 +165,7 @@ func TestFilters(t *testing.T) {
 
 func TestFilterErrors(t *testing.T) {
 	for _, f := range []FilterBlock{
-		{"nosuchfilter", nil}, {"split", []any{"/", 9}}, {"regexp", `(?<=a)b`}, {"dateparse", "yyyy-MM-dd"},
+		{"nosuchfilter", nil}, {"split", []any{"/", 9}}, {"regexp", `(`}, {"dateparse", "yyyy-MM-dd"},
 		{"diacritics", "keep"}, {"jsonjoinarray", []any{"$.x", ","}},
 	} {
 		if _, err := applyFilters("not-a-date/x", []FilterBlock{f}, nil); err == nil {
