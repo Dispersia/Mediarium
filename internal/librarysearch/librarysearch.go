@@ -276,7 +276,10 @@ func Rebuild(ctx context.Context, db *sql.DB) error {
 		 SELECT m.id * 8 + 1, m.title, coalesce(v.alt, '') FROM movies m LEFT JOIN library_search_alt_movies v ON v.id = m.id WHERE m.copy_of IS NULL`,
 		`INSERT INTO library_search(rowid, title, alt)
 		 SELECT s.id * 8 + 2, s.title, coalesce(v.alt, '') FROM series s LEFT JOIN library_search_alt_series v ON v.id = s.id`,
-		`INSERT INTO library_search(rowid, title, alt) SELECT id * 8 + 3, title, coalesce(author, '') FROM books`,
+		`INSERT INTO library_search(rowid, title, alt)
+		 SELECT b.id * 8 + 3, b.title,
+		        trim(coalesce(b.author, '') || ' ' || coalesce((SELECT group_concat(title, ' ') FROM book_titles WHERE book_id = b.id), ''))
+		 FROM books b`,
 		`INSERT INTO library_search(rowid, title, alt) SELECT id * 8 + 4, name, trim(coalesce(sort_name, '')) FROM artists`,
 		`INSERT INTO library_search(rowid, title, alt)
 		 SELECT a.id * 8 + 5, a.title, coalesce(r.name, '') FROM albums a LEFT JOIN artists r ON r.id = a.artist_id`,

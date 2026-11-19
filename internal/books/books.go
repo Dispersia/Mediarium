@@ -41,8 +41,14 @@ type Book struct {
 	Year        int
 	CoverID     int
 	Description string
-	AddedAt     string
-	AddedBy     int64
+	// Titles are the book's titles in other languages (see titles.go). Get and
+	// List fill them in; the release search and the import naming use them.
+	// TitlesCheckedAt is when they were last looked up ("" = never), so a book
+	// with none known is not asked about again on every page view.
+	Titles          []Title
+	TitlesCheckedAt string
+	AddedAt         string
+	AddedBy         int64
 	// Origin is how the book came into the library: by a person, a request, a
 	// followed author or series, a library folder scan... (only Kind and Name
 	// are kept; the person is AddedBy). The zero value is a book from before
@@ -126,14 +132,14 @@ func NewRepo(db *sql.DB) *Repo { return &Repo{db: db} }
 
 const columns = `id, ol_key, title, author, author_key, year, cover_id, description, added_at, COALESCE(added_by, 0),
 	want_ebook, ebook_status, ebook_format, ebook_path, want_audiobook, audiobook_status, audiobook_format, audiobook_path,
-	series_name, series_position, release_date, asin, narrators, runtime_min, audio_checked_at, own_cover, picked_cover_id, origin_kind, origin_name`
+	series_name, series_position, release_date, asin, narrators, runtime_min, audio_checked_at, own_cover, picked_cover_id, origin_kind, origin_name, titles_checked_at`
 
 func scan(sc interface{ Scan(...any) error }) (Book, error) {
 	var b Book
 	err := sc.Scan(&b.ID, &b.OLKey, &b.Title, &b.Author, &b.AuthorKey, &b.Year, &b.CoverID, &b.Description, &b.AddedAt, &b.AddedBy,
 		&b.WantEbook, &b.EbookStatus, &b.EbookFormat, &b.EbookPath, &b.WantAudiobook, &b.AudioStatus, &b.AudioFormat, &b.AudioPath,
 		&b.SeriesName, &b.SeriesPosition, &b.ReleaseDate, &b.ASIN, &b.Narrators, &b.RuntimeMin, &b.AudioCheckedAt,
-		&b.OwnCover, &b.PickedCoverID, &b.Origin.Kind, &b.Origin.Name)
+		&b.OwnCover, &b.PickedCoverID, &b.Origin.Kind, &b.Origin.Name, &b.TitlesCheckedAt)
 	return b, err
 }
 
@@ -169,6 +175,9 @@ func (r *Repo) Get(id int64) (Book, error) {
 		}
 		return Book{}, fmt.Errorf("get book: %w", err)
 	}
+	if err := r.attachTitles(&b); err != nil {
+		return Book{}, err
+	}
 	return b, nil
 }
 
@@ -181,7 +190,67 @@ func (r *Repo) GetByKey(olKey string) (Book, bool, error) {
 	if err != nil {
 		return Book{}, false, fmt.Errorf("get book: %w", err)
 	}
+	if err := r.attachTitles(&b); err != nil {
+		return Book{}, false, err
+	}
 	return b, true, nil
+}
+
+// attachTitles loads a book's titles in other languages onto it.
+func (r *Repo) attachTitles(b *Book) error {
+	titles, err := r.titles(b.ID)
+	if err != nil {
+		return err
+	}
+	b.Titles = titles
+	return nil
+}
+
+// titles reads a book's titles in other languages.
+func (r *Repo) titles(bookID int64) ([]Title, error) {
+	rows, err := r.db.Query(`SELECT lang, title, source FROM book_titles WHERE book_id = ? ORDER BY lang`, bookID)
+	if err != nil {
+		return nil, fmt.Errorf("read book titles: %w", err)
+	}
+	defer rows.Close()
+	var out []Title
+	for rows.Next() {
+		var t Title
+		if err := rows.Scan(&t.Lang, &t.Title, &t.Source); err != nil {
+			return nil, fmt.Errorf("read book titles: %w", err)
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// SetTitles replaces a book's titles in other languages with titles (none
+// clears them) and records that they were looked up now. The api package calls
+// it after looking the titles up.
+func (r *Repo) SetTitles(bookID int64, titles []Title) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("save book titles: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.Exec(`DELETE FROM book_titles WHERE book_id = ?`, bookID); err != nil {
+		return fmt.Errorf("save book titles: %w", err)
+	}
+	for _, t := range titles {
+		t.Lang, t.Title = strings.TrimSpace(t.Lang), strings.TrimSpace(t.Title)
+		if t.Lang == "" || t.Title == "" {
+			continue
+		}
+		if _, err := tx.Exec(`INSERT INTO book_titles (book_id, lang, title, source) VALUES (?, ?, ?, ?)
+			ON CONFLICT (book_id, lang) DO UPDATE SET title = excluded.title, source = excluded.source`,
+			bookID, t.Lang, t.Title, t.Source); err != nil {
+			return fmt.Errorf("save book titles: %w", err)
+		}
+	}
+	if _, err := tx.Exec(`UPDATE books SET titles_checked_at = ? WHERE id = ?`, time.Now().UTC().Format(time.RFC3339), bookID); err != nil {
+		return fmt.Errorf("save book titles: %w", err)
+	}
+	return tx.Commit()
 }
 
 // List returns every book, newest first.
@@ -199,7 +268,41 @@ func (r *Repo) List() ([]Book, error) {
 		}
 		out = append(out, b)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := r.attachTitlesAll(out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// attachTitlesAll loads the titles in other languages for a whole list of
+// books in one query.
+func (r *Repo) attachTitlesAll(list []Book) error {
+	if len(list) == 0 {
+		return nil
+	}
+	at := make(map[int64]int, len(list))
+	for i := range list {
+		at[list[i].ID] = i
+	}
+	rows, err := r.db.Query(`SELECT book_id, lang, title, source FROM book_titles ORDER BY book_id, lang`)
+	if err != nil {
+		return fmt.Errorf("read book titles: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var t Title
+		if err := rows.Scan(&id, &t.Lang, &t.Title, &t.Source); err != nil {
+			return fmt.Errorf("read book titles: %w", err)
+		}
+		if i, ok := at[id]; ok {
+			list[i].Titles = append(list[i].Titles, t)
+		}
+	}
+	return rows.Err()
 }
 
 // Version is the book list's change marker. It moves whenever a book is

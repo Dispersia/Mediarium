@@ -109,11 +109,11 @@ Switch on **Follow this author** there and their new books are added by themselv
 
 ## Which release is picked
 
-Mediarium searches for the author and title together, and when that finds nothing, for the title alone (some indexers don't index authors). The second search leaves out any indexer that failed or timed out in the first one, since it would only take as long again.
+Mediarium searches for the author and title together, and when that finds nothing, for the title alone (some indexers don't index authors). It also searches for the book's titles in other languages, so a release of a translation is found (see [Titles in other languages](#titles-in-other-languages)). The second search leaves out any indexer that failed or timed out in the first one, since it would only take as long again.
 
 Only the indexers that can do books are asked. A site added from the site list says in its definition which categories it has, so one that lists no books (a movie or TV site) is not asked for an ebook, and one with no audio is not asked for an audiobook; an audio site counts as able to hold audiobooks. Newznab and Torznab indexers are always asked, because Mediarium does not keep their capabilities. The release list names the indexers that were left out ("2 indexers that don't do books or audiobooks were skipped: ..."), and says so when none of your indexers lists books. The same filter keeps album searches away from sites without audio.
 
-When you press **Choose a release**, the search stops after 25 seconds and shows what the quicker indexers found by then, with a note naming the ones that did not answer, instead of failing after 30 seconds with nothing. Both searches share those 25 seconds. Either way, a release has to name the book's title and the author's surname. Small words like "the" and "of" don't count, so "Tolkien - Hobbit" still matches *The Hobbit*. A release of another book by the same author, or the other format, is left out.
+When you press **Choose a release**, the search stops after 25 seconds and shows what the quicker indexers found by then, with a note naming the ones that did not answer, instead of failing after 30 seconds with nothing. Both searches share those 25 seconds. Either way, a release has to name one of the book's titles and the author's surname (a title in another script, such as Japanese, does not need the author's name, see [Titles in other languages](#titles-in-other-languages)). Small words like "the" and "of" don't count, so "Tolkien - Hobbit" still matches *The Hobbit*. A release of another book by the same author, or the other format, is left out.
 
 Among the matches, the file type decides:
 
@@ -133,6 +133,16 @@ The **languages you want** (Settings > Finding releases > Quality, the same sett
 - A release whose name and category say nothing counts as English, as it does for films. With **Only take releases in these languages** on, it is then only taken when English is one of your languages.
 
 To read the category names, Mediarium asks each Newznab or Torznab indexer for its list of categories once a day, and only when a book release comes from a category that isn't a standard one. That one request counts against the indexer's daily limit (#128, mirisbowring).
+
+### Titles in other languages
+
+A book's title in another language is kept too, so a translation can be found and picked. When a book is added, Mediarium reads the titles of its editions from [Open Library](https://openlibrary.org) (the work's editions) and from Google Books (every language, not just the one the info pages are read in), and keeps one per language on the book's page under **Titles in other languages**. For a book whose title or author is written in Japanese, [NDL Search](https://ndlsearch.ndl.go.jp) (the National Diet Library's catalogue, the authoritative one for Japanese editions) is asked as well, and its title wins over Google Books'. **Look up titles** there asks again; a book added by hand is left alone.
+
+The Library search finds a book by these titles too, so typing the Japanese title turns up the English book. The "Titles in other languages" card says what is known.
+
+The release search sends each of those titles to your indexers as well, up to three besides the catalogue title, so an English book's Japanese or Chinese release turns up in **Choose a release**. A title in another script than the catalogue's is matched without needing the author's name in the release, because a translation is often posted with the author written in its own script, or with no author at all.
+
+When such a release is imported, the ebook file and its folder are named after the title of the release's own language: the Japanese release of *Norwegian Wood* becomes `Haruki Murakami/ノルウェイの森 (1987)/ノルウェイの森.epub`. This follows the release you picked; an English release keeps the English title.
 
 ## Where the files go
 

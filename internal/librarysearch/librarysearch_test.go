@@ -241,6 +241,31 @@ func TestEnsureFillsAnEmptyIndex(t *testing.T) {
 	}
 }
 
+// A book is found by its title in another language too (the Japanese title of
+// an English book), and by its author; a title removed moves the book's row.
+func TestBooksAreFoundByTheirOtherLanguageTitles(t *testing.T) {
+	db := openDB(t)
+	ctx := context.Background()
+	exec(t, db, `INSERT INTO books (ol_key, title, author, year) VALUES ('OLNW', 'Norwegian Wood', 'Haruki Murakami', 1987)`)
+	exec(t, db, `INSERT INTO book_titles (book_id, lang, title) VALUES (1, 'Japanese', 'ノルウェイの森')`)
+	if hits, _ := librarysearch.Search(ctx, db, "ノルウェイの森", 10); len(hits) != 1 || hits[0].Title != "Norwegian Wood" {
+		t.Fatalf("the Japanese title should find the book: %+v", hits)
+	}
+	if hits, _ := librarysearch.Search(ctx, db, "norwegian", 10); len(hits) != 1 {
+		t.Fatalf("the English title should find the book: %+v", hits)
+	}
+	if hits, _ := librarysearch.Search(ctx, db, "murakami", 10); len(hits) != 1 {
+		t.Fatalf("the author should find the book: %+v", hits)
+	}
+	exec(t, db, `DELETE FROM book_titles WHERE book_id = 1`)
+	if hits, _ := librarysearch.Search(ctx, db, "ノルウェイの森", 10); len(hits) != 0 {
+		t.Fatalf("the removed title still finds the book: %+v", hits)
+	}
+	if hits, _ := librarysearch.Search(ctx, db, "murakami", 10); len(hits) != 1 {
+		t.Fatalf("the author is lost after the title went: %+v", hits)
+	}
+}
+
 // When the index cannot be read, the LIKE search answers instead.
 func TestSearchFallsBackToLike(t *testing.T) {
 	db := openDB(t)

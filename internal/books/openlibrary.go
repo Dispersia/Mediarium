@@ -289,6 +289,47 @@ func (c *Client) GetWork(ctx context.Context, key string) (Work, error) {
 	return w, nil
 }
 
+// Titles returns the titles of a work's editions in their own languages, from
+// /works/{key}/editions.json. It is how an English book's Japanese or Chinese
+// title is found, so a release in that language can be searched for and
+// matched. An edition in a language Mediarium does not know is left out, and
+// one title is kept per language.
+func (c *Client) Titles(ctx context.Context, key string) ([]Title, error) {
+	key = strings.TrimPrefix(strings.TrimSpace(key), "/works/")
+	if key == "" || strings.ContainsAny(key, "/?#") || IsManualKey(key) {
+		return nil, ErrNotFound
+	}
+	var res struct {
+		Entries []struct {
+			Title string `json:"title"`
+			Langs []struct {
+				Key string `json:"key"`
+			} `json:"languages"`
+		} `json:"entries"`
+	}
+	if err := c.get(ctx, "/works/"+url.PathEscape(key)+"/editions.json", url.Values{"limit": {"200"}}, &res); err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	var out []Title
+	for _, e := range res.Entries {
+		title := strings.TrimSpace(e.Title)
+		if title == "" || len(e.Langs) == 0 {
+			continue
+		}
+		for _, l := range e.Langs {
+			lang := LanguageFromMARC(strings.TrimPrefix(l.Key, "/languages/"))
+			if lang == "" || seen[lang] {
+				continue
+			}
+			seen[lang] = true
+			out = append(out, Title{Lang: lang, Title: title, Source: "openlibrary"})
+			break
+		}
+	}
+	return out, nil
+}
+
 // textOf reads a description that is either a string or {"value": "..."}.
 func textOf(raw json.RawMessage) string {
 	if len(raw) == 0 {

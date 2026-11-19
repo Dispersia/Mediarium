@@ -90,6 +90,7 @@ type Server struct {
 	EReader           *ereader.Repo     // e-reader password and Kobo sync address (ereader_*.go)
 	ereader           ereaderRuntime    // limits and store address for the e-reader routes (ereader_auth.go)
 	OpenLibrary       *books.Client
+	NDL               *books.NDL      // the National Diet Library catalogue, for Japanese titles (book_titles.go)
 	Artwork           *imgproxy.Proxy // resizes and keeps posters and backdrops (artwork_proxy.go)
 	artworkOnce       sync.Once
 	Requests          *requests.Repo
@@ -340,6 +341,7 @@ func New(db *sql.DB, cfg config.Config, box *crypto.Box, defaultTMDBAPIKey, vers
 		s.EReader = ereader.NewRepo(db, nil)
 	}
 	s.OpenLibrary = books.NewClient("Mediarium/" + version + " (https://mediarium.app)")
+	s.NDL = books.NewNDL(s.OpenLibrary.UserAgent)
 	s.Audnexus = books.NewAudnexus(s.OpenLibrary.UserAgent)
 	s.Requests = requests.NewRepo(db)
 	s.mb = musicbrainz.New(version)
@@ -677,6 +679,7 @@ func (s *Server) protectedRoutes() *routeTable {
 	member.HandleFunc("GET /api/books/{id}", s.handleGetBook)
 	manage.HandleFunc("PUT /api/books/{id}/want", s.handleSetBookWant)
 	manage.HandleFunc("POST /api/books/{id}/search", s.handleSearchBookNow)
+	manage.HandleFunc("POST /api/books/{id}/titles/refresh", s.handleRefreshBookTitles)
 	admin.HandleFunc("DELETE /api/books/{id}", s.handleDeleteBook)
 	releases.HandleFunc("GET /api/books/{id}/releases", s.handleBookReleases)
 	releases.HandleFunc("POST /api/books/{id}/grab", s.handleGrabBook)

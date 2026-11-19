@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rdborg/mediarium/internal/animemap"
+	"github.com/rdborg/mediarium/internal/books"
 	"github.com/rdborg/mediarium/internal/crypto"
 	"github.com/rdborg/mediarium/internal/library"
 	"github.com/rdborg/mediarium/internal/metadata"
@@ -163,6 +164,14 @@ func (s *Server) TestBackfillDisplayFaces(ctx context.Context) { s.backfillDispl
 // TestSetGoogleBooks points the Google Books client at a fake server.
 func (s *Server) TestSetGoogleBooks(url string) {
 	s.googleBooksBase = url
+}
+
+// TestSetNDL points the NDL Search client at a fake server.
+func (s *Server) TestSetNDL(url string) {
+	if s.NDL == nil {
+		s.NDL = books.NewNDL("Mediarium/test")
+	}
+	s.NDL.Base = url
 }
 
 // TestBackfillGenres runs the scheduled genre backfill once.

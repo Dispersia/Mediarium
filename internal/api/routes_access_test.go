@@ -154,6 +154,7 @@ var memberRoutes = []string{
 	"DELETE /api/books/{id}/cover",
 	"PUT /api/books/{id}/want",
 	"POST /api/books/{id}/search",
+	"POST /api/books/{id}/titles/refresh",
 	"GET /api/books/{id}/releases",
 	"POST /api/books/{id}/grab",
 	"GET /api/music/profiles",

@@ -2935,6 +2935,14 @@ a.bar-label:hover { color: var(--accent); }
 .book-file { margin: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .book-file code { font-size: 0.82rem; color: var(--text-dim); word-break: break-all; }
 .book-releases { grid-column: 1 / -1; }
+/* The book's titles in other languages: the language and the title a release
+   of a translation is searched for and filed under. */
+.book-titles { margin-top: 16px; }
+.book-titles h2 { margin: 0 0 4px; font-size: 1.05rem; }
+.book-title-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.book-title-list li { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.book-title-lang { color: var(--text-dim); font-size: 0.8rem; min-width: 7em; }
+.book-title-name { font-weight: 600; }
 @media (max-width: 600px) { .book-formats { grid-template-columns: minmax(0, 1fr); } }
 
 /* Dashboard module cards: five of them. One row when they fit; otherwise each

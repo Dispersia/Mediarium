@@ -55,10 +55,64 @@ var foreignArticle = map[string]bool{"le": true, "la": true, "les": true, "el": 
 
 var small = map[string]bool{"the": true, "a": true, "an": true, "of": true, "and": true, "to": true, "in": true, "on": true, "for": true}
 
-// Matches reports whether a release name is about book b: the title's words
-// appear together, not as part of a longer title ("It" is not "If It
-// Bleeds"), and the author's surname is in it too (when known).
+// Matches reports whether a release name is about book b: one of the book's
+// titles appears as a run of words (see titleRunAt), and the author's surname
+// is in it too (when known). The book's titles in other languages are tried as
+// well, so a Japanese or Chinese release is matched to the English book it is
+// a translation of (see Titles).
 func Matches(release string, b Book) bool {
+	_, ok := MatchTitle(release, b)
+	return ok
+}
+
+// MatchTitle reports which of the book's titles a release name matches - the
+// catalogue title first (Lang ""), then the titles in other languages - so an
+// import can be filed under the right one. ok is false when none matches.
+func MatchTitle(release string, b Book) (Title, bool) {
+	for _, cand := range b.matchTitles() {
+		if titleMatches(release, cand.Title, b.Author, cand.Lang != "") {
+			return cand, true
+		}
+	}
+	return Title{}, false
+}
+
+// TitleForRelease is the title a release should be filed under: the book's
+// title in the release's own language when the release matches one of them,
+// else the catalogue title.
+func TitleForRelease(release string, b Book) string {
+	if t, ok := MatchTitle(release, b); ok && strings.TrimSpace(t.Title) != "" {
+		return t.Title
+	}
+	return b.Title
+}
+
+// matchTitles is the catalogue title (no language) followed by the titles in
+// other languages, without repeats.
+func (b Book) matchTitles() []Title {
+	out := []Title{{Title: b.Title}}
+	seen := map[string]bool{strings.ToLower(strings.TrimSpace(b.Title)): true}
+	for _, t := range b.Titles {
+		key := strings.ToLower(strings.TrimSpace(t.Title))
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, t)
+	}
+	return out
+}
+
+// titleMatches reports whether release names the title titleText: its words
+// appear together, not as part of a longer title ("It" is not "If It Bleeds").
+//
+// alternate says titleText is one of the book's titles in another language.
+// When that title is written in a script the catalogue's title is not (the
+// Japanese "ノルウェイの森" for the English "Norwegian Wood"), the author's name
+// is not required in the release and any neighbour around the title's words is
+// allowed: a translation's release often writes the author in its own script,
+// which the catalogue does not give us, or leaves the author out.
+func titleMatches(release, titleText, authorText string, alternate bool) bool {
 	// "(Dune Chronicles #1)": the series a catalogue lists a book under is not
 	// part of its title.
 	rel := words(seriesNote.ReplaceAllString(release, " "))
@@ -66,10 +120,11 @@ func Matches(release string, b Book) bool {
 	for _, w := range rel {
 		have[w] = true
 	}
-	if a := words(b.Author); len(a) > 0 && !have[a[len(a)-1]] {
+	foreign := alternate && hasNonLatinLetters(titleText)
+	if a := words(authorText); len(a) > 0 && !have[a[len(a)-1]] && !foreign {
 		return false
 	}
-	title := words(b.Title)
+	title := words(titleText)
 	important := 0
 	for _, w := range title {
 		if !small[w] {
@@ -80,12 +135,13 @@ func Matches(release string, b Book) bool {
 		return false
 	}
 	author := map[string]bool{}
-	for _, w := range words(b.Author) {
+	for _, w := range words(authorText) {
 		author[w] = true
 	}
+	strict := !foreign
 	// A leading "The" or "A" is often left out of release names.
 	for len(title) > 0 {
-		if titleRunAt(rel, title, author) {
+		if titleRunAt(rel, title, author, strict) {
 			return true
 		}
 		if !small[title[0]] && !(foreignArticle[title[0]] && len(title) > 1) {
@@ -98,8 +154,9 @@ func Matches(release string, b Book) bool {
 
 // titleRunAt reports whether title appears in rel as a run of words with only
 // the author's name, a number (a year, a series number) or a tag such as the
-// format next to it.
-func titleRunAt(rel, title []string, author map[string]bool) bool {
+// format next to it. With strict false (a title in another script) any
+// neighbouring word is allowed.
+func titleRunAt(rel, title []string, author map[string]bool, strict bool) bool {
 	edge := func(w string) bool {
 		return author[w] || noiseWord[w] || EbookRank(w) > 0 || AudioRank(w) > 0 || isNumber(w) || isOrdinal(w)
 	}
@@ -114,12 +171,12 @@ func titleRunAt(rel, title []string, author map[string]bool) bool {
 		if !run {
 			continue
 		}
-		before := i == 0 || edge(rel[i-1])
+		before := !strict || i == 0 || edge(rel[i-1])
 		end := i + len(title)
-		after := end == len(rel) || edge(rel[end])
+		after := !strict || end == len(rel) || edge(rel[end])
 		// "Dune 02 - Dune Messiah": a series number with another title after it
 		// is the next book of the series, not this one.
-		if after && end+1 < len(rel) && isNumber(rel[end]) && len(rel[end]) < 4 && !edge(rel[end+1]) {
+		if strict && after && end+1 < len(rel) && isNumber(rel[end]) && len(rel[end]) < 4 && !edge(rel[end+1]) {
 			after = false
 		}
 		if before && after {

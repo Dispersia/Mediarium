@@ -334,6 +334,23 @@ func (g *GoogleBooks) Check(ctx context.Context) error {
 // holding a search typed in Japanese or Chinese to the info language drops
 // exactly the editions the person is looking for.
 func (g *GoogleBooks) Search(ctx context.Context, q, lang string, limit int) ([]GoogleHit, error) {
+	restrict := ""
+	if !hasNonLatinLetters(q) {
+		restrict = GoogleBooksLanguage(lang)
+	}
+	return g.search(ctx, q, restrict, limit)
+}
+
+// SearchAny asks Google Books without a language restriction, to find a book's
+// editions in other languages (by its title, or an ISBN). The titles lookup
+// uses it, so an English title still finds its Japanese or Chinese editions.
+func (g *GoogleBooks) SearchAny(ctx context.Context, q string, limit int) ([]GoogleHit, error) {
+	return g.search(ctx, q, "", limit)
+}
+
+// search is the one Google Books request behind Search and SearchAny. restrict
+// is the langRestrict to send ("" sends none).
+func (g *GoogleBooks) search(ctx context.Context, q, restrict string, limit int) ([]GoogleHit, error) {
 	q = strings.TrimSpace(q)
 	if len(q) < 2 {
 		return []GoogleHit{}, nil
@@ -346,8 +363,8 @@ func (g *GoogleBooks) Search(ctx context.Context, q, lang string, limit int) ([]
 		"maxResults": {strconv.Itoa(limit)},
 		"printType":  {"books"},
 	}
-	if !hasNonLatinLetters(q) {
-		query.Set("langRestrict", GoogleBooksLanguage(lang))
+	if restrict != "" {
+		query.Set("langRestrict", restrict)
 	}
 	status, body, err := g.fetch(ctx, "/volumes", query)
 	if err != nil {

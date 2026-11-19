@@ -209,7 +209,13 @@ func (s *Server) runBookPipeline(queueID int64, b books.Book, f books.Format, re
 	if ctx.Err() != nil {
 		return fail(ctx.Err())
 	}
-	folder, err := s.bookFolder(b, f)
+	// A release of a translation is filed under the title of its own language:
+	// the Japanese release of "Norwegian Wood" under "ノルウェイの森".
+	named := b
+	if t := books.TitleForRelease(releaseTitle, b); strings.TrimSpace(t) != "" {
+		named.Title = t
+	}
+	folder, err := s.bookFolder(named, f)
 	if err != nil {
 		return fail(err)
 	}
@@ -221,7 +227,7 @@ func (s *Server) runBookPipeline(queueID int64, b books.Book, f books.Format, re
 			return fail(badRelease(errors.New("the download has no ebook file (epub, azw3, mobi or pdf)")))
 		}
 		mode, repl := s.illegalCharSettings()
-		dest := filepath.Join(folder, organizer.Sanitize(b.Title, mode, repl)+"."+format)
+		dest := filepath.Join(folder, organizer.Sanitize(named.Title, mode, repl)+"."+format)
 		res, err := s.importDownloaded(src, dest, organizer.ConflictOverwriteIfBetter, func() bool {
 			return books.EbookRank(format) >= books.EbookRank(b.EbookFormat)
 		})

@@ -168,6 +168,7 @@ Every route the server exposes. Routes marked **public** need no sign-in; all ot
 | GET | `/api/books/{id}/read` | any account | GET /api/books/{id}/read: the ebook file. |
 | GET | `/api/books/{id}/releases` | any account |  |
 | POST | `/api/books/{id}/search` | any account |  |
+| POST | `/api/books/{id}/titles/refresh` | any account | looks the book's titles in other languages up again (Open Library's editions and Google Books) and answers with the book; a title of another script is searched for and a release of it is filed under that title. |
 | GET | `/api/books/{id}/tracks` | any account | GET /api/books/{id}/tracks: the audiobook's tracks in order. |
 | PUT | `/api/books/{id}/want` | any account |  |
 

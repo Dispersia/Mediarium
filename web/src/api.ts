@@ -2748,6 +2748,9 @@ export interface Book {
   narrators?: string // the audiobook's readers, "Ray Porter, Jane Doe"
   runtimeMin?: number // the audiobook's length
   asin?: string // its Audible id
+  // The book's titles in other languages, searched for and used to file a
+  // release of a translation (see book_titles.go).
+  titles?: { lang: string; title: string }[]
 }
 
 // A book's series (from Open Library, or Hardcover with a token).
@@ -4166,6 +4169,8 @@ export const api = {
   grabBook: (id: number, data: { format: BookFormat; releaseTitle: string; downloadUrl: string; sizeBytes: number; protocol?: SearchResult['protocol'] }) =>
     post<{ queueId: number }>(`/books/${id}/grab`, data),
   searchNowBook: (id: number, format: BookFormat) => post<{ grabbed: number; message: string }>(`/books/${id}/search?format=${format}`),
+  // Look the book's titles in other languages up again (Open Library and Google Books).
+  refreshBookTitles: (id: number) => post<Book>(`/books/${id}/titles/refresh`, {}),
   listArtists: () => request<MusicArtist[]>('/music/artists', { revalidate: true }),
   getArtist: (id: number) => get<MusicArtist>(`/music/artists/${id}`),
   addArtist: (data: { mbid: string; monitor?: MusicMonitor; profileId?: number; searchNow?: boolean; albumMbid?: string; albumTitle?: string; song?: string }) => post<MusicArtist | Requested>('/music/artists', data),

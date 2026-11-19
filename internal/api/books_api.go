@@ -33,6 +33,11 @@ var (
 	audiobookCategories = []int{3030}
 )
 
+// maxBookTitleQueries is how many of a book's titles in other languages the
+// release search asks the indexers for, besides the catalogue title. Each is
+// another search, so only a few are tried.
+const maxBookTitleQueries = 3
+
 func categoriesFor(f books.Format) []int {
 	if f == books.Audiobook {
 		return audiobookCategories
@@ -54,6 +59,12 @@ type bookFormatPayload struct {
 	Path   string `json:"path,omitempty"`
 }
 
+// bookTitlePayload is one of a book's titles in another language.
+type bookTitlePayload struct {
+	Lang  string `json:"lang"`
+	Title string `json:"title"`
+}
+
 type bookPayload struct {
 	ID          int64             `json:"id"`
 	OLKey       string            `json:"olKey"`
@@ -67,6 +78,10 @@ type bookPayload struct {
 	AddedAt     string            `json:"addedAt"`
 	Ebook       bookFormatPayload `json:"ebook"`
 	Audiobook   bookFormatPayload `json:"audiobook"`
+
+	// Titles are the book's titles in other languages (see book_titles.go),
+	// used to search for and match a release of a translation.
+	Titles []bookTitlePayload `json:"titles,omitempty"`
 
 	SeriesName     string `json:"seriesName,omitempty"`
 	SeriesPosition string `json:"seriesPosition,omitempty"`
@@ -90,6 +105,9 @@ func toBookPayload(b books.Book, admin bool) bookPayload {
 		Audiobook:  bookFormatPayload{Wanted: b.WantAudiobook, Status: b.AudioStatus, Format: b.AudioFormat},
 		SeriesName: b.SeriesName, SeriesPosition: b.SeriesPosition, ReleaseDate: b.ReleaseDate,
 		Narrators: b.Narrators, RuntimeMin: b.RuntimeMin, ASIN: b.ASIN}
+	for _, t := range b.Titles {
+		p.Titles = append(p.Titles, bookTitlePayload{Lang: t.Lang, Title: t.Title})
+	}
 	if admin {
 		p.Ebook.Path, p.Audiobook.Path = b.EbookPath, b.AudioPath
 	}
@@ -145,6 +163,7 @@ func (s *Server) bookFromPath(w http.ResponseWriter, r *http.Request) (books.Boo
 func (s *Server) handleGetBook(w http.ResponseWriter, r *http.Request) {
 	if b, ok := s.bookFromPath(w, r); ok {
 		s.lookUpAudioDetailsLater(b)
+		s.bookTitlesLater(b)
 		p := toBookPayload(b, isAdminRequest(r))
 		if isAdminRequest(r) {
 			p.Origin = originOut(b.Origin, s.accountNames()(b.AddedBy))
@@ -332,6 +351,7 @@ func (s *Server) finishAddBook(w http.ResponseWriter, r *http.Request, req addBo
 		s.searchNewBook(created, userOrigin(r, origin.Search))
 	}
 	s.lookUpAudioDetailsLater(created)
+	s.bookTitlesLater(created)
 	writeJSON(w, http.StatusCreated, toBookPayload(created, isAdminRequest(r)))
 }
 
@@ -500,7 +520,37 @@ func (s *Server) searchBookReleases(ctx context.Context, b books.Book, f books.F
 		}
 		return out
 	}
-	out := matching(list, strings.TrimSpace(b.Author+" "+b.Title))
+	// The catalogue title first, then the book's titles in other languages, so
+	// a Japanese or Chinese translation is found and can be picked. The
+	// languages wanted (Settings > Quality) put that release first below.
+	queried := map[string]bool{}
+	seen := map[string]bool{}
+	var out []indexers.Result
+	search := func(asked []indexers.Instance, query string) {
+		query = strings.TrimSpace(query)
+		if query == "" || queried[strings.ToLower(query)] {
+			return
+		}
+		queried[strings.ToLower(query)] = true
+		for _, res := range matching(asked, query) {
+			key := res.IndexerName + "\x00" + res.Title + "\x00" + strconv.FormatInt(res.SizeBytes, 10)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, res)
+		}
+	}
+	search(list, b.Author+" "+b.Title)
+	for i, t := range b.Titles {
+		if i >= maxBookTitleQueries || ctx.Err() != nil {
+			break
+		}
+		if strings.EqualFold(strings.TrimSpace(t.Title), b.Title) {
+			continue
+		}
+		search(list, b.Author+" "+t.Title)
+	}
 	if len(out) == 0 && b.Author != "" && ctx.Err() == nil {
 		// Some indexers don't index the author: try the title alone (the
 		// release still has to name the author to match). An indexer that
@@ -518,9 +568,7 @@ func (s *Server) searchBookReleases(ctx context.Context, b books.Book, f books.F
 				again = append(again, inst)
 			}
 		}
-		if len(again) > 0 {
-			out = matching(again, b.Title)
-		}
+		search(again, b.Title)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		ri, rj := books.ReleaseRank(out[i].Title, f), books.ReleaseRank(out[j].Title, f)

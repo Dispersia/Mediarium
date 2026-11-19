@@ -165,6 +165,7 @@ function BookPage({ id }: { id?: string }) {
           <FormatPanel key={f} book={book} format={f} queue={queue} onChanged={load} />
         ))}
       </div>
+      <BookTitles book={book} onChanged={load} />
       {!fromAudible && !byHand && <BookSeries workKey={book.olKey} title={book.title} author={book.author} />}
       {book.authorKey && <AuthorBooks authorKey={book.authorKey} author={book.author} exclude={book.olKey} />}
       {formats.length === 0 && (
@@ -173,6 +174,54 @@ function BookPage({ id }: { id?: string }) {
         </p>
       )}
     </div>
+  )
+}
+
+// The book's titles in other languages: what the release search looks for too,
+// and what a release of a translation is filed under. "Look up titles" asks
+// Open Library and Google Books again.
+function BookTitles({ book, onChanged }: { book: Book; onChanged: () => void }) {
+  const me = useAuth().user
+  const toast = useToast()
+  const [busy, setBusy] = useState(false)
+  async function refresh() {
+    setBusy(true)
+    try {
+      await api.refreshBookTitles(book.id)
+      onChanged()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const titles = book.titles ?? []
+  return (
+    <section className="card book-titles">
+      <h2>{t('Titles in other languages')}</h2>
+      <p className="hint">
+        {t('Your indexers are searched for these titles too, so a translation can be found and picked. A release of a translation is filed under its own title.')}
+      </p>
+      {titles.length > 0 ? (
+        <ul className="book-title-list">
+          {titles.map((tl) => (
+            <li key={tl.lang}>
+              <span className="book-title-lang">{tl.lang}</span>
+              <span className="book-title-name">{tl.title}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="hint">{t('None known yet.')}</p>
+      )}
+      {can(me, 'manage') && (
+        <div className="row-actions">
+          <button className="btn-with-icon" disabled={busy} onClick={() => void refresh()}>
+            <Icon name="refresh" size={16} /> {busy ? t('Looking up…') : t('Look up titles')}
+          </button>
+        </div>
+      )}
+    </section>
   )
 }
 
