@@ -3358,6 +3358,27 @@ img[data-broken] { visibility: hidden; }
 .rel-table td.rel-name { min-width: 11rem; overflow-wrap: anywhere; }
 .rel-table td.rel-name .badge { white-space: normal; overflow-wrap: normal; }
 
+/* On a phone the list is wider than the screen, and the Grab button used to
+   sit at the far right, out of sight until the list was swiped sideways. The
+   action stays at the right edge instead, so it is always there to tap. */
+@media (max-width: 700px) {
+  /* A phone shows the release, its language and the Grab button, and nothing
+     else: the other columns used to push the button off the screen. The
+     language moves under the release name. */
+  .rel-table :is(.rel-col-quality, .rel-col-language, .rel-col-score, .rel-col-indexer, .rel-col-size, .rel-col-age, .rel-col-seeders) {
+    display: none;
+  }
+  .rel-scroll { -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+  .rel-table td.rel-name[data-language]::after {
+    content: attr(data-language);
+    display: block;
+    margin-top: 3px;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+  }
+  .rel-table :is(th, td).rel-col-action { white-space: nowrap; }
+}
+
 /* "Why this score": a small button after the score opens a row under the release. The row sticks to the left edge of the scrolling box and is as wide as the screen, so it reads without sideways scrolling on a phone. */
 .rel-why-btn { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 28px; height: 28px; margin-left: 6px; border-radius: 6px; color: var(--text-dim); cursor: pointer; vertical-align: middle; }
 .rel-why-btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }

@@ -86,7 +86,7 @@ export default function ReleaseTable({
     })
   }
   const head = (key: ReleaseSortKey, label: string, title?: string) => (
-    <th aria-sort={sort?.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'} title={title}>
+    <th className={`rel-col-${key}`} aria-sort={sort?.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'} title={title}>
       <button type="button" className="th-sort" onClick={() => clickSort(key)}>
         {label}
         <span className="th-arrow" aria-hidden="true">
@@ -173,7 +173,7 @@ export default function ReleaseTable({
                 {head('size', t('Size'))}
                 {head('age', t('Age'), t('How long ago the indexer posted it'))}
                 {head('seeders', t('Seeders'))}
-                <th></th>
+                <th className="rel-col-action"></th>
               </tr>
             </thead>
             <tbody>
@@ -183,7 +183,7 @@ export default function ReleaseTable({
                 return (
                 <Fragment key={rowKeys[i]}>
                 <tr className={open ? 'rel-open' : undefined} style={r.rejections?.length || r.blocklisted ? { opacity: 0.75 } : undefined}>
-                  <td className="rel-name">
+                  <td className="rel-name" data-language={r.language}>
                     {nameParts(r.title).map((p, i) => (
                       <Fragment key={i}>
                         {p}
@@ -243,9 +243,9 @@ export default function ReleaseTable({
                     )}
                     {!showScore && why && whyButton(r, why, t('Details for this release'))}
                   </td>
-                  <td className="rel-fit">{qualityLabel?.(r) || [r.resolution, r.source, r.codec].filter(Boolean).join(' · ') || '—'}</td>
+                  <td className="rel-fit rel-col-quality">{qualityLabel?.(r) || [r.resolution, r.source, r.codec].filter(Boolean).join(' · ') || '—'}</td>
                   {showLanguage && (
-                    <td className="rel-fit">
+                    <td className="rel-fit rel-col-language">
                       {r.language ? (
                         <span
                           className={r.languageFit === 'other' ? 'badge conflict' : 'lang-hint'}
@@ -265,20 +265,20 @@ export default function ReleaseTable({
                     </td>
                   )}
                   {showScore && (
-                    <td className={`rel-fit format-score-cell${(scoreOf(r) ?? 0) < 0 ? ' neg' : ''}`} title={scoreTip(r)}>
+                    <td className={`rel-fit rel-col-score format-score-cell${(scoreOf(r) ?? 0) < 0 ? ' neg' : ''}`} title={scoreTip(r)}>
                       {scoreOf(r) === undefined ? '—' : signed(scoreOf(r) ?? 0)}
                       {why && whyButton(r, why, t('Why this score'))}
                     </td>
                   )}
-                  <td className="rel-fit">
+                  <td className="rel-fit rel-col-indexer">
                     <span className="badge" title={r.protocol}>
                       {r.protocol === 'torrent' ? '⇅' : r.protocol === 'soulseek' ? '♫' : '⇩'} {r.indexerName}
                     </span>
                   </td>
-                  <td className="rel-fit">{formatBytes(r.sizeBytes)}</td>
-                  <td className="rel-fit" title={r.publishDate && publishedAt(r) ? new Date(publishedAt(r)).toLocaleString(locale()) : undefined}>{ageOf(r) || '—'}</td>
-                  <td className={`rel-fit${r.belowMinSeeders ? ' rel-dim' : ''}`}>{r.protocol === 'torrent' ? `${r.seeders ?? 0} / ${r.peers ?? 0}` : r.protocol === 'soulseek' ? peerLine(r) : '—'}</td>
-                  <td className="rel-fit">
+                  <td className="rel-fit rel-col-size">{formatBytes(r.sizeBytes)}</td>
+                  <td className="rel-fit rel-col-age" title={r.publishDate && publishedAt(r) ? new Date(publishedAt(r)).toLocaleString(locale()) : undefined}>{ageOf(r) || '—'}</td>
+                  <td className={`rel-fit rel-col-seeders${r.belowMinSeeders ? ' rel-dim' : ''}`}>{r.protocol === 'torrent' ? `${r.seeders ?? 0} / ${r.peers ?? 0}` : r.protocol === 'soulseek' ? peerLine(r) : '—'}</td>
+                  <td className="rel-fit rel-col-action">
                     <button className="primary" disabled={grabbing !== null} onClick={() => onGrab(r)}>
                       {grabbing === r.downloadUrl ? t('Grabbing…') : t('Grab')}
                     </button>
