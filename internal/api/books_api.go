@@ -582,7 +582,7 @@ func (s *Server) searchBookReleases(ctx context.Context, b books.Book, f books.F
 	})
 	// A release in a wanted language goes first; the name says the language,
 	// or the indexer's category for it does.
-	found.Results, found.Fits = sortBooksByLanguage(out, s.bookLanguageFits(ctx, out, list))
+	found.Results, found.Fits = sortBooksByLanguage(out, s.bookLanguageFits(ctx, b, out, list))
 	return found, nil
 }
 

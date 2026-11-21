@@ -28,6 +28,25 @@ func TestLanguageFromMARCAndISO(t *testing.T) {
 	}
 }
 
+func TestLanguageFromScript(t *testing.T) {
+	cases := []struct {
+		title, want string
+	}{
+		{"ノルウェイの森", "Japanese"},               // kana
+		{"村上春樹 - ノルウェイの森 [EPUB]", "Japanese"}, // kana and kanji together
+		{"挪威的森林", "Chinese"},                  // Han alone
+		{"Norwegian Wood", ""},                // Latin
+		{"Преступление и наказание", ""},      // Cyrillic: not guessed
+		{"오징어 게임", "Korean"},                  // Hangul
+		{"", ""},
+	}
+	for _, tc := range cases {
+		if got := LanguageFromScript(tc.title); got != tc.want {
+			t.Errorf("LanguageFromScript(%q) = %q, want %q", tc.title, got, tc.want)
+		}
+	}
+}
+
 func TestLanguageWantedAndTitleForLanguage(t *testing.T) {
 	wanted := []string{"Chinese", "japanese", "English"}
 	if !LanguageWanted(wanted, "Japanese") {

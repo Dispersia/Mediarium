@@ -85,9 +85,12 @@ func (s *Server) refreshBookTitles(ctx context.Context, b books.Book) ([]books.T
 	default:
 		slog.Info("books: Open Library editions", "book", b.ID, "err", err)
 	}
-	// NDL Search is the authoritative Japanese catalogue: ask it for a
-	// Japanese book, and keep its title over Google Books'.
-	if s.NDL != nil && (books.HasJapaneseScript(b.Title) || books.HasJapaneseScript(b.Author)) {
+	// NDL Search is the authoritative Japanese catalogue: ask it for every
+	// book, not only one written in Japanese, because a translation is filed
+	// under a Japanese title the English catalogues do not list (the Japanese
+	// "冒険者カールの地球ダンジョン" for "Dungeon Crawler Carl"). Its title wins
+	// over Google Books'.
+	if s.NDL != nil {
 		ndl, err := s.NDL.Titles(ctx, b.Title, b.Author)
 		if err == nil {
 			answered = true

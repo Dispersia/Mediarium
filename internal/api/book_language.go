@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/rdborg/mediarium/internal/books"
 	"github.com/rdborg/mediarium/internal/indexers"
 	"github.com/rdborg/mediarium/internal/parser"
 	"github.com/rdborg/mediarium/internal/quality"
@@ -142,10 +143,24 @@ func languageAsOwnPart(name string) string {
 }
 
 // bookRelease is a book release read for its language: the name's own
-// language tags, or else the language of the category it was filed under.
-func (s *Server) bookRelease(ctx context.Context, res indexers.Result, byName map[string]indexers.Instance) parser.Release {
+// language tags, the language of the book's title the name matches, the script
+// it is written in, or else the language of the category it was filed under.
+func (s *Server) bookRelease(ctx context.Context, b books.Book, res indexers.Result, byName map[string]indexers.Instance) parser.Release {
 	rel := parser.Parse(res.Title)
 	if len(rel.Languages) > 0 || rel.Multi {
+		return rel
+	}
+	// The release is named by one of the book's titles in another language
+	// ("ノルウェイの森"): that title's language is the release's, which also
+	// tells an all-kanji Japanese title from a Chinese one.
+	if t, ok := books.MatchTitle(res.Title, b); ok && t.Lang != "" {
+		rel.Languages = []string{t.Lang}
+		return rel
+	}
+	// A title written in Japanese, Chinese or Korean script says its language
+	// by itself, even when the release carries no tag in words.
+	if lang := books.LanguageFromScript(res.Title); lang != "" {
+		rel.Languages = []string{lang}
 		return rel
 	}
 	inst, ok := byName[res.IndexerName]
@@ -167,7 +182,7 @@ func (s *Server) bookRelease(ctx context.Context, res indexers.Result, byName ma
 // bookLanguageFits judges each release for the wanted languages: Rank orders
 // them (higher first) and Accepted is false for one clearly in another
 // language, which automation leaves alone.
-func (s *Server) bookLanguageFits(ctx context.Context, results []indexers.Result, instances []indexers.Instance) []quality.LanguageFit {
+func (s *Server) bookLanguageFits(ctx context.Context, b books.Book, results []indexers.Result, instances []indexers.Instance) []quality.LanguageFit {
 	byName := map[string]indexers.Instance{}
 	for _, inst := range instances {
 		byName[inst.Name] = inst
@@ -175,7 +190,7 @@ func (s *Server) bookLanguageFits(ctx context.Context, results []indexers.Result
 	preferred, only, ignoreExtra := s.preferredLanguage(), s.languageOnly(), s.languageIgnoreExtra()
 	out := make([]quality.LanguageFit, len(results))
 	for i, res := range results {
-		out[i] = quality.FitLanguageWith(s.bookRelease(ctx, res, byName), quality.ResolveOriginal(preferred, ""), only, ignoreExtra)
+		out[i] = quality.FitLanguageWith(s.bookRelease(ctx, b, res, byName), quality.ResolveOriginal(preferred, ""), only, ignoreExtra)
 	}
 	return out
 }

@@ -1,6 +1,9 @@
 package books
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+)
 
 // A book's titles in other languages. A release of a book that was translated
 // is named by that language's title (the Japanese "ノルウェイの森" for the English
@@ -39,6 +42,37 @@ func LanguageWanted(wanted []string, lang string) bool {
 		}
 	}
 	return false
+}
+
+// LanguageFromScript is the language a title written in its own script is in,
+// as release names often are: "Japanese" for kana (or kana with kanji),
+// "Chinese" for Han on its own and "Korean" for Hangul. "" for a title in the
+// Latin alphabet or a script it does not recognise.
+//
+// A Japanese title made only of kanji cannot be told from a Chinese one, so it
+// counts as Chinese here. When the book's own title in another language is
+// known, that language wins over this guess (see MatchTitle).
+func LanguageFromScript(s string) string {
+	kana, han, hangul := false, false, false
+	for _, r := range s {
+		switch {
+		case unicode.In(r, unicode.Hiragana, unicode.Katakana):
+			kana = true
+		case unicode.Is(unicode.Han, r):
+			han = true
+		case unicode.Is(unicode.Hangul, r):
+			hangul = true
+		}
+	}
+	switch {
+	case kana:
+		return "Japanese"
+	case hangul:
+		return "Korean"
+	case han:
+		return "Chinese"
+	}
+	return ""
 }
 
 // openLibraryLanguage maps the MARC language code an Open Library edition

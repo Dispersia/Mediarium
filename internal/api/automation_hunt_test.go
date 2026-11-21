@@ -83,6 +83,10 @@ func newHuntTestServer(t *testing.T) (*api.Server, *httptest.Server, *http.Clien
 	if err != nil {
 		t.Fatalf("new api server: %v", err)
 	}
+	// A book's titles are looked up in the background; NDL Search is asked for
+	// every book now, so without a fake it would make every test wait on a real
+	// request. A test that needs NDL points it at its own server.
+	server.TestSetNDL("http://127.0.0.1:1")
 	// Runs before the database closes (cleanups run last-registered first).
 	t.Cleanup(func() { settleDownloads(t, server) })
 

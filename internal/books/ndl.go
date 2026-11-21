@@ -181,8 +181,6 @@ func firstOf(list []string) string {
 }
 
 // HasJapaneseScript reports whether s holds Japanese script (kana or kanji).
-// It is how a Japanese book is told from a Western one, to decide whether NDL
-// is asked for it.
 func HasJapaneseScript(s string) bool {
 	for _, r := range s {
 		if unicode.In(r, unicode.Hiragana, unicode.Katakana, unicode.Han) {

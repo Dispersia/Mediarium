@@ -25,7 +25,7 @@ The language for movie and show information is its own choice, apart from the sc
 - Log lines, and the messages of the server that Mediarium has no translation for (a message that is made up of pieces, or a detail another program sent, such as a provider's own error). Emails and push messages are written in English too. The film or show title and poster in them follow the info language.
 - Names of other apps and services (Plex, Jellyfin, TMDB, OpenSubtitles…), release names and quality names such as 1080p. New movie and show folders and file names stay in English unless you switch on the option described above.
 - Button and menu names of other apps' own websites in setup steps (for example where to find a key on TMDB), so they match what you see there.
-- Music and book details: they come from MusicBrainz and Open Library as those services provide them, a book's other-language titles from Open Library, Google Books and (for Japanese) NDL Search. (Movie and show details can be read in your language: see below.)
+- Music and book details: they come from MusicBrainz and Open Library as those services provide them, a book's other-language titles from Open Library, Google Books and NDL Search. (Movie and show details can be read in your language: see below.)
 
 ## Helping with a translation
 
